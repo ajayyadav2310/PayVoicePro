@@ -1,8 +1,10 @@
 package com.ajay.payvoicepro
 
+import android.content.Context
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import java.util.Locale
 
 class PaymentNotificationListener : NotificationListenerService() {
@@ -26,17 +28,37 @@ class PaymentNotificationListener : NotificationListenerService() {
         super.onCreate()
 
         tts = TextToSpeech(this) { status ->
+
             ttsReady = status == TextToSpeech.SUCCESS
 
             if (ttsReady) {
-                setVoiceLanguage()
+                configureVoice()
             }
         }
+    }
+
+    private fun configureVoice() {
+
+        val prefs = getSharedPreferences(
+            "payvoice",
+            MODE_PRIVATE
+        )
+
+        val locale = if (
+            prefs.getInt("language", 0) == 0
+        ) {
+            Locale("hi", "IN")
+        } else {
+            Locale.US
+        }
+
+        tts?.language = locale
     }
 
     override fun onNotificationPosted(
         sbn: StatusBarNotification
     ) {
+
         val packageName = sbn.packageName
 
         if (packageName !in supportedApps) return
@@ -56,32 +78,39 @@ class PaymentNotificationListener : NotificationListenerService() {
             .getCharSequence("android.title")
             ?.toString().orEmpty()
 
-        val message = extras
+        val body = extras
             .getCharSequence("android.text")
             ?.toString().orEmpty()
 
-        val fullText = "$title $message".trim()
+        val bigText = extras
+            .getCharSequence("android.bigText")
+            ?.toString().orEmpty()
+
+        val fullText = "$title $body $bigText".trim()
 
         if (fullText.isBlank()) return
 
         val lower = fullText.lowercase(Locale.ROOT)
 
-        val keywords = listOf(
+        val paymentKeywords = listOf(
             "received",
             "credited",
             "payment",
             "paid",
             "₹",
             "inr",
-            "rs."
+            "rs.",
+            "failed",
+            "declined",
+            "unsuccessful"
         )
 
-        if (keywords.none { lower.contains(it) }) {
+        if (paymentKeywords.none { lower.contains(it) }) {
             return
         }
 
         val uniqueKey =
-            "${sbn.key}:${sbn.postTime}:$fullText"
+            "${sbn.key}:${sbn.postTime}"
 
         if (!seenNotifications.add(uniqueKey)) {
             return
@@ -93,27 +122,33 @@ class PaymentNotificationListener : NotificationListenerService() {
             )
         }
 
-        val amount = Regex(
-            "(?:₹|rs\\.?|inr)\\s?([0-9,]+(?:\\.\\d{1,2})?)",
-            RegexOption.IGNORE_CASE
-        ).find(fullText)?.groupValues?.get(1)
-
         val isFailed = listOf(
             "failed",
             "declined",
             "unsuccessful"
         ).any { lower.contains(it) }
 
+        val amount = Regex(
+            "(?:₹|rs\\.?|inr)\\s?([0-9,]+(?:\\.\\d{1,2})?)",
+            RegexOption.IGNORE_CASE
+        ).find(fullText)?.groupValues?.get(1)
+
         val announcement = when {
-            isFailed -> "Payment failed notification received"
+
+            isFailed ->
+                "Payment failed notification received"
 
             amount != null ->
                 "Payment notification. Amount $amount rupees"
 
-            else -> "Payment notification received"
+            else ->
+                "Payment notification received"
         }
 
         if (ttsReady) {
+
+            configureVoice()
+
             tts?.speak(
                 announcement,
                 TextToSpeech.QUEUE_ADD,
@@ -123,27 +158,79 @@ class PaymentNotificationListener : NotificationListenerService() {
         }
     }
 
-    private fun setVoiceLanguage() {
-        val prefs = getSharedPreferences(
-            "payvoice",
-            MODE_PRIVATE
-        )
-
-        val locale = if (
-            prefs.getInt("language", 0) == 0
-        ) {
-            Locale("hi", "IN")
-        } else {
-            Locale.US
-        }
-
-        tts?.language = locale
-    }
-
     override fun onDestroy() {
+
         tts?.stop()
         tts?.shutdown()
+
         tts = null
+        ttsReady = false
+
         super.onDestroy()
+    }
+
+    companion object {
+
+        fun speakTest(context: Context) {
+
+            lateinit var testEngine: TextToSpeech
+
+            testEngine = TextToSpeech(
+                context.applicationContext
+            ) { status ->
+
+                if (status == TextToSpeech.SUCCESS) {
+
+                    val prefs = context.getSharedPreferences(
+                        "payvoice",
+                        Context.MODE_PRIVATE
+                    )
+
+                    val locale = if (
+                        prefs.getInt("language", 0) == 0
+                    ) {
+                        Locale("hi", "IN")
+                    } else {
+                        Locale.US
+                    }
+
+                    testEngine.language = locale
+
+                    testEngine.setOnUtteranceProgressListener(
+                        object : UtteranceProgressListener() {
+
+                            override fun onStart(id: String?) {}
+
+                            override fun onDone(id: String?) {
+                                testEngine.shutdown()
+                            }
+
+                            @Deprecated("Deprecated in Java")
+                            override fun onError(id: String?) {
+                                testEngine.shutdown()
+                            }
+                        }
+                    )
+
+                    val message = if (
+                        prefs.getInt("language", 0) == 0
+                    ) {
+                        "पे वॉइस प्रो तैयार है"
+                    } else {
+                        "PayVoice Pro is ready"
+                    }
+
+                    testEngine.speak(
+                        message,
+                        TextToSpeech.QUEUE_FLUSH,
+                        null,
+                        "payvoice_test"
+                    )
+
+                } else {
+                    testEngine.shutdown()
+                }
+            }
+        }
     }
 }
