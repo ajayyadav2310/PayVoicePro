@@ -6,16 +6,19 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
 import android.provider.Settings
-import android.view.Gravity
 import android.view.View
 import android.widget.*
 import android.content.res.ColorStateList
+import android.content.ComponentName
 
 class MainActivity : Activity() {
 
     private val green = Color.rgb(33, 233, 133)
     private val bg = Color.rgb(7, 17, 13)
     private val card = Color.rgb(16, 28, 22)
+
+    private lateinit var statusText: TextView
+    private lateinit var accessButton: Button
 
     private val apps = listOf(
         "PhonePe" to "com.phonepe.app",
@@ -40,6 +43,52 @@ class MainActivity : Activity() {
         showDashboard()
     }
 
+    override fun onResume() {
+        super.onResume()
+
+        if (::statusText.isInitialized) {
+            updateAccessStatus()
+        }
+    }
+
+    private fun isNotificationAccessEnabled(): Boolean {
+        val component = ComponentName(
+            this,
+            PaymentNotificationListener::class.java
+        )
+
+        val enabledListeners = Settings.Secure.getString(
+            contentResolver,
+            "enabled_notification_listeners"
+        ) ?: return false
+
+        return enabledListeners.split(":").any {
+            ComponentName.unflattenFromString(it) == component
+        }
+    }
+
+    private fun updateAccessStatus() {
+
+        val enabled = isNotificationAccessEnabled()
+
+        if (enabled) {
+            statusText.text = "● Notification Access: ACTIVE"
+            statusText.setTextColor(green)
+
+            accessButton.text = "Notification Access Enabled"
+            accessButton.isEnabled = false
+            accessButton.alpha = 0.65f
+
+        } else {
+            statusText.text = "● Notification Access: DISABLED"
+            statusText.setTextColor(Color.rgb(255, 100, 100))
+
+            accessButton.text = "Enable Notification Access"
+            accessButton.isEnabled = true
+            accessButton.alpha = 1f
+        }
+    }
+
     private fun showDashboard() {
 
         val root = LinearLayout(this).apply {
@@ -60,7 +109,34 @@ class MainActivity : Activity() {
         content.addView(space(22))
 
         content.addView(label("Welcome back!", 22f, Color.WHITE, true))
-        content.addView(label("Manage your payment voice announcements.", 13f, Color.LTGRAY))
+        content.addView(
+            label(
+                "Manage your payment voice announcements.",
+                13f,
+                Color.LTGRAY
+            )
+        )
+
+        content.addView(space(20))
+
+        content.addView(label("Service Status", 18f, Color.WHITE, true))
+
+        statusText = label(
+            "Checking Notification Access...",
+            15f,
+            Color.YELLOW,
+            true
+        )
+
+        content.addView(statusText)
+
+        accessButton = actionButton("Enable Notification Access") {
+            startActivity(
+                Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+            )
+        }
+
+        content.addView(accessButton)
 
         content.addView(space(20))
 
@@ -71,7 +147,11 @@ class MainActivity : Activity() {
         mode.adapter = ArrayAdapter(
             this,
             android.R.layout.simple_spinner_dropdown_item,
-            listOf("Personal Mode", "Shopkeeper Mode", "Business Mode")
+            listOf(
+                "Personal Mode",
+                "Shopkeeper Mode",
+                "Business Mode"
+            )
         )
 
         mode.setSelection(prefs.getInt("mode", 0))
@@ -79,7 +159,9 @@ class MainActivity : Activity() {
         mode.onItemSelectedListener =
             object : android.widget.AdapterView.OnItemSelectedListener {
 
-                override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+                override fun onNothingSelected(
+                    parent: android.widget.AdapterView<*>?
+                ) {}
 
                 override fun onItemSelected(
                     parent: android.widget.AdapterView<*>?,
@@ -95,7 +177,9 @@ class MainActivity : Activity() {
 
         content.addView(space(22))
 
-        content.addView(label("Payment App Selection", 18f, Color.WHITE, true))
+        content.addView(
+            label("Payment App Selection", 18f, Color.WHITE, true)
+        )
 
         apps.forEach { (name, pkg) ->
 
@@ -133,7 +217,9 @@ class MainActivity : Activity() {
         language.onItemSelectedListener =
             object : android.widget.AdapterView.OnItemSelectedListener {
 
-                override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+                override fun onNothingSelected(
+                    parent: android.widget.AdapterView<*>?
+                ) {}
 
                 override fun onItemSelected(
                     parent: android.widget.AdapterView<*>?,
@@ -149,36 +235,34 @@ class MainActivity : Activity() {
 
         content.addView(space(22))
 
-        content.addView(actionButton("Enable Notification Access") {
-            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-        })
-
         content.addView(actionButton("Test Voice") {
             PaymentNotificationListener.speakTest(this)
         })
 
-        content.addView(actionButton("Privacy, Terms & Support") {
-            PrivacySupport.showMenu(this)
-        })
+        content.addView(
+            actionButton("Privacy, Terms & Support") {
+                PrivacySupport.showMenu(this)
+            }
+        )
 
         content.addView(space(22))
 
+        content.addView(label("PayVoice Pro", 16f, green, true))
+        content.addView(label("Version 1.0.0", 12f, Color.GRAY))
         content.addView(
-            label("PayVoice Pro", 16f, green, true)
-        )
-
-        content.addView(
-            label("Version 1.0.0", 12f, Color.GRAY)
-        )
-
-        content.addView(
-            label("Support: ajayyadav966171@gmail.com", 12f, Color.GRAY)
+            label(
+                "Support: ajayyadav966171@gmail.com",
+                12f,
+                Color.GRAY
+            )
         )
 
         scroll.addView(content)
         root.addView(scroll)
 
         setContentView(root)
+
+        updateAccessStatus()
     }
 
     private fun label(
