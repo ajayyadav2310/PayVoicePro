@@ -1,24 +1,29 @@
 package com.ajay.payvoicepro
 
 import android.app.Activity
+import android.content.ComponentName
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.provider.Settings
+import android.view.Gravity
 import android.view.View
 import android.widget.*
-import android.content.res.ColorStateList
-import android.content.ComponentName
 
 class MainActivity : Activity() {
 
-    private val green = Color.rgb(33, 233, 133)
-    private val bg = Color.rgb(7, 17, 13)
-    private val card = Color.rgb(16, 28, 22)
+    private val bg = Color.rgb(6, 15, 12)
+    private val surface = Color.rgb(15, 29, 23)
+    private val surface2 = Color.rgb(21, 39, 31)
+    private val green = Color.rgb(39, 230, 137)
+    private val white = Color.rgb(241, 247, 243)
+    private val muted = Color.rgb(151, 171, 159)
 
     private lateinit var statusText: TextView
-    private lateinit var accessButton: Button
+    private lateinit var accessButton: TextView
 
     private val apps = listOf(
         "PhonePe" to "com.phonepe.app",
@@ -36,283 +41,320 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         window.statusBarColor = bg
         window.navigationBarColor = bg
-
         showDashboard()
     }
 
     override fun onResume() {
         super.onResume()
-
-        if (::statusText.isInitialized) {
-            updateAccessStatus()
-        }
+        if (::statusText.isInitialized) updateAccessStatus()
     }
 
     private fun isNotificationAccessEnabled(): Boolean {
         val component = ComponentName(
-            this,
-            PaymentNotificationListener::class.java
+            this, PaymentNotificationListener::class.java
         )
-
-        val enabledListeners = Settings.Secure.getString(
-            contentResolver,
-            "enabled_notification_listeners"
+        val enabled = Settings.Secure.getString(
+            contentResolver, "enabled_notification_listeners"
         ) ?: return false
 
-        return enabledListeners.split(":").any {
+        return enabled.split(":").any {
             ComponentName.unflattenFromString(it) == component
         }
     }
 
     private fun updateAccessStatus() {
+        val active = isNotificationAccessEnabled()
+        statusText.text = if (active)
+            "●  Notification access is active"
+        else
+            "●  Notification access is off"
 
-        val enabled = isNotificationAccessEnabled()
+        statusText.setTextColor(
+            if (active) green else Color.rgb(255, 112, 112)
+        )
 
-        if (enabled) {
-            statusText.text = "● Notification Access: ACTIVE"
-            statusText.setTextColor(green)
+        accessButton.text = if (active)
+            "Notification access enabled  ✓"
+        else
+            "Enable notification access  →"
 
-            accessButton.text = "Notification Access Enabled"
-            accessButton.isEnabled = false
-            accessButton.alpha = 0.65f
-
-        } else {
-            statusText.text = "● Notification Access: DISABLED"
-            statusText.setTextColor(Color.rgb(255, 100, 100))
-
-            accessButton.text = "Enable Notification Access"
-            accessButton.isEnabled = true
-            accessButton.alpha = 1f
-        }
+        accessButton.alpha = if (active) 0.72f else 1f
     }
 
     private fun showDashboard() {
-
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(22, 25, 22, 20)
             setBackgroundColor(bg)
+            setPadding(dp(20), dp(12), dp(20), dp(20))
         }
 
-        val scroll = ScrollView(this)
+        root.setOnApplyWindowInsetsListener { view, insets ->
+            view.setPadding(
+                dp(20), dp(12) + insets.systemWindowInsetTop,
+                dp(20), dp(20)
+            )
+            insets
+        }
+
+        val scroll = ScrollView(this).apply {
+            clipToPadding = false
+            isFillViewport = true
+        }
 
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            setPadding(0, 0, 0, dp(18))
         }
 
-        content.addView(label("PAYVOICE PRO", 28f, green, true))
-        content.addView(label("Your Payments, Your Voice", 14f, Color.LTGRAY))
-
-        content.addView(space(22))
-
-        content.addView(label("Welcome back!", 22f, Color.WHITE, true))
-        content.addView(
-            label(
-                "Manage your payment voice announcements.",
-                13f,
-                Color.LTGRAY
-            )
-        )
-
-        content.addView(space(20))
-
-        content.addView(label("Service Status", 18f, Color.WHITE, true))
-
-        statusText = label(
-            "Checking Notification Access...",
-            15f,
-            Color.YELLOW,
-            true
-        )
-
-        content.addView(statusText)
-
-        accessButton = actionButton("Enable Notification Access") {
-            startActivity(
-                Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-            )
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(18), dp(18), dp(18))
+            background = rounded(surface, 22)
         }
 
-        content.addView(accessButton)
+        header.addView(text("PAYVOICE PRO", 25f, green, true))
+        header.addView(text("YOUR PAYMENTS, YOUR VOICE", 11f, muted, true))
+        content.addView(header, matchWrap())
+        content.addView(space(18))
 
-        content.addView(space(20))
+        content.addView(text("Dashboard", 22f, white, true))
+        content.addView(text("Manage your payment announcements", 13f, muted))
+        content.addView(space(14))
 
-        content.addView(label("Select Mode", 18f, green, true))
+        val statusCard = card()
+        statusCard.addView(text("SERVICE STATUS", 11f, muted, true))
 
-        val mode = Spinner(this)
+        statusText = text("Checking notification access…", 15f, green, true)
+        statusCard.addView(statusText)
 
-        mode.adapter = ArrayAdapter(
-            this,
-            android.R.layout.simple_spinner_dropdown_item,
-            listOf(
-                "Personal Mode",
-                "Shopkeeper Mode",
-                "Business Mode"
+        accessButton = actionTile("Enable notification access  →") {
+            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+        }
+
+        statusCard.addView(accessButton, matchWrap())
+        content.addView(statusCard, matchWrap())
+        content.addView(space(16))
+
+        content.addView(sectionTitle("Your mode"))
+
+        val mode = Spinner(this).apply {
+            adapter = ArrayAdapter(
+                this@MainActivity,
+                android.R.layout.simple_spinner_dropdown_item,
+                listOf("Personal", "Shopkeeper", "Business")
             )
-        )
+            setSelection(prefs.getInt("mode", 0).coerceIn(0, 2))
+            backgroundTintList = ColorStateList.valueOf(green)
 
-        mode.setSelection(prefs.getInt("mode", 0))
+            onItemSelectedListener =
+                object : AdapterView.OnItemSelectedListener {
+                    override fun onNothingSelected(parent: AdapterView<*>?) {}
 
-        mode.onItemSelectedListener =
-            object : android.widget.AdapterView.OnItemSelectedListener {
-
-                override fun onNothingSelected(
-                    parent: android.widget.AdapterView<*>?
-                ) {}
-
-                override fun onItemSelected(
-                    parent: android.widget.AdapterView<*>?,
-                    view: View?,
-                    position: Int,
-                    id: Long
-                ) {
-                    prefs.edit().putInt("mode", position).apply()
+                    override fun onItemSelected(
+                        parent: AdapterView<*>?,
+                        view: View?,
+                        position: Int,
+                        id: Long
+                    ) {
+                        prefs.edit().putInt("mode", position).apply()
+                    }
                 }
-            }
+        }
 
-        content.addView(mode)
+        val modeCard = card()
+        modeCard.addView(mode, matchWrap())
+        content.addView(modeCard, matchWrap())
+        content.addView(space(16))
 
-        content.addView(space(22))
-
+        content.addView(sectionTitle("Payment apps"))
         content.addView(
-            label("Payment App Selection", 18f, Color.WHITE, true)
+            text("Choose which app notifications PayVoice can read.", 12f, muted)
         )
+        content.addView(space(6))
+
+        val appsCard = card()
 
         apps.forEach { (name, pkg) ->
-
             val check = CheckBox(this).apply {
                 text = name
-                textSize = 15f
-                setTextColor(Color.WHITE)
-
+                textSize = 14f
+                setTextColor(white)
                 buttonTintList = ColorStateList.valueOf(green)
-
                 isChecked = prefs.getBoolean("app_$pkg", true)
+                setPadding(0, dp(3), 0, dp(3))
 
                 setOnCheckedChangeListener { _, checked ->
                     prefs.edit().putBoolean("app_$pkg", checked).apply()
                 }
             }
-
-            content.addView(check)
+            appsCard.addView(check, matchWrap())
         }
 
-        content.addView(space(18))
+        content.addView(appsCard, matchWrap())
+        content.addView(space(16))
 
-        content.addView(label("Voice Language", 18f, green, true))
+        content.addView(sectionTitle("Announcement language"))
 
-        val language = Spinner(this)
+        val languageCard = card()
 
-        language.adapter = ArrayAdapter(
-            this,
-            android.R.layout.simple_spinner_dropdown_item,
-            listOf("Hindi", "English")
-        )
+        val language = Spinner(this).apply {
+            adapter = ArrayAdapter(
+                this@MainActivity,
+                android.R.layout.simple_spinner_dropdown_item,
+                listOf("Hindi", "English")
+            )
+            setSelection(prefs.getInt("language", 0).coerceIn(0, 1))
+            backgroundTintList = ColorStateList.valueOf(green)
 
-        language.setSelection(prefs.getInt("language", 0))
+            onItemSelectedListener =
+                object : AdapterView.OnItemSelectedListener {
+                    override fun onNothingSelected(parent: AdapterView<*>?) {}
 
-        language.onItemSelectedListener =
-            object : android.widget.AdapterView.OnItemSelectedListener {
-
-                override fun onNothingSelected(
-                    parent: android.widget.AdapterView<*>?
-                ) {}
-
-                override fun onItemSelected(
-                    parent: android.widget.AdapterView<*>?,
-                    view: View?,
-                    position: Int,
-                    id: Long
-                ) {
-                    prefs.edit().putInt("language", position).apply()
+                    override fun onItemSelected(
+                        parent: AdapterView<*>?,
+                        view: View?,
+                        position: Int,
+                        id: Long
+                    ) {
+                        prefs.edit().putInt("language", position).apply()
+                    }
                 }
-            }
+        }
 
-        content.addView(language)
+        languageCard.addView(language, matchWrap())
+        content.addView(languageCard, matchWrap())
+        content.addView(space(16))
 
-        content.addView(space(22))
-
-        content.addView(actionButton("Test Voice") {
-            PaymentNotificationListener.speakTest(this)
-        })
+        content.addView(sectionTitle("Quick actions"))
 
         content.addView(
-            actionButton("Privacy, Terms & Support") {
+            actionTile("▶   Test voice announcement") {
+                PaymentNotificationListener.speakTest(this)
+            },
+            matchWrap()
+        )
+
+        content.addView(space(8))
+
+        content.addView(
+            actionTile("Privacy, terms & support  →") {
                 PrivacySupport.showMenu(this)
+            },
+            matchWrap()
+        )
+
+        content.addView(space(20))
+
+        val footer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(12), dp(16), dp(12), dp(12))
+            background = rounded(surface, 18)
+        }
+
+        footer.addView(
+            text("PAYVOICE PRO", 14f, green, true).apply {
+                gravity = Gravity.CENTER
             }
         )
 
-        content.addView(space(22))
+        footer.addView(
+            text(
+                "Version 1.0.0  •  Support: ajayyadav966171@gmail.com",
+                11f, muted
+            ).apply {
+                gravity = Gravity.CENTER
+            }
+        )
 
-        content.addView(label("PayVoice Pro", 16f, green, true))
-        content.addView(label("Version 1.0.0", 12f, Color.GRAY))
-        content.addView(
-            label(
-                "Support: ajayyadav966171@gmail.com",
-                12f,
-                Color.GRAY
+        content.addView(footer, matchWrap())
+
+        scroll.addView(content)
+
+        root.addView(
+            scroll,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.MATCH_PARENT
             )
         )
 
-        scroll.addView(content)
-        root.addView(scroll)
-
         setContentView(root)
-
         updateAccessStatus()
     }
 
-    private fun label(
+    private fun card(): LinearLayout =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+            background = rounded(surface, 18)
+        }
+
+    private fun sectionTitle(value: String): TextView =
+        text(value, 17f, white, true).apply {
+            setPadding(0, 0, 0, dp(8))
+        }
+
+    private fun text(
         value: String,
         size: Float,
         color: Int,
         bold: Boolean = false
-    ): TextView {
-
-        return TextView(this).apply {
+    ): TextView =
+        TextView(this).apply {
             text = value
             textSize = size
             setTextColor(color)
-
-            if (bold) {
-                typeface = Typeface.DEFAULT_BOLD
-            }
-
-            setPadding(0, 7, 0, 7)
+            typeface = if (bold)
+                Typeface.create("sans-serif", Typeface.BOLD)
+            else
+                Typeface.create("sans-serif", Typeface.NORMAL)
+            includeFontPadding = true
+            setPadding(0, dp(3), 0, dp(3))
         }
-    }
 
-    private fun actionButton(
+    private fun actionTile(
         title: String,
         action: () -> Unit
-    ): Button {
-
-        return Button(this).apply {
+    ): TextView =
+        TextView(this).apply {
             text = title
-            isAllCaps = false
             textSize = 14f
-            setTextColor(Color.WHITE)
-            setBackgroundColor(card)
-
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                58
-            ).apply {
-                bottomMargin = 12
-            }
-
-            setOnClickListener {
-                action()
-            }
+            setTextColor(
+                if (title.startsWith("Notification access enabled"))
+                    muted else green
+            )
+            typeface = Typeface.create(
+                "sans-serif-medium", Typeface.NORMAL
+            )
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), dp(13), dp(14), dp(13))
+            background = rounded(surface2, 13)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { action() }
         }
-    }
 
-    private fun space(height: Int): View {
-        return View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(1, height)
+    private fun rounded(color: Int, radius: Int) =
+        GradientDrawable().apply {
+            setColor(color)
+            cornerRadius = dp(radius).toFloat()
+            setStroke(dp(1), Color.rgb(31, 55, 43))
         }
-    }
+
+    private fun matchWrap() =
+        LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+
+    private fun space(height: Int) =
+        View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(1, dp(height))
+        }
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
 }
