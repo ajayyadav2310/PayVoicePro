@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PayVoice Pro</string>
+    <string name="tagline">Your Payments, Your Voice</string>
+    <string name="notification_access_label">PayVoice Pro Notification Access</string>
+    <string name="support_email">ajayyadav966171@gmail.com</string>
+    <string name="mode_personal">Personal Mode</string>
+    <string name="mode_shopkeeper">Shopkeeper Mode</string>
+    <string name="mode_business">Business Mode</string>
+    <string name="voice_hindi">Hindi</string>
+    <string name="voice_english">English</string>
+    <string name="enable_notification_access">Enable Notification Access</string>
+    <string name="test_voice">Test Voice</string>
+    <string name="privacy_support">Privacy, Terms &amp; Support</string>
+</resources>
